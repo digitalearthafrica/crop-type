@@ -270,7 +270,7 @@ def feature_layers(query):
     
     #keep mostly clear scenes by calculating the number of good pixels per scene and applying a threshold
     #set a good data fraction
-    min_gooddata = 0.90
+    min_gooddata = 0.95
 
     #keep only the images that are at least as clear as min_gooddata
     good_slice = clear_and_dry.mean(['x','y']) >= min_gooddata

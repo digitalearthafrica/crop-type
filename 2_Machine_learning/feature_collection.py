@@ -126,7 +126,7 @@ def feature_layers(query):
         "Q3_2021": slice("2021-08-01", "2022-10-31"),
         "Q4_2021": slice("2021-11-01", "2022-01-31"),
         "Q1_2022": slice("2022-02-01", "2022-04-30"),
-#         "Q2_2022": slice("2022-05-01", "2022-07-30"),
+        "Q2_2022": slice("2022-05-01", "2022-07-30"),
     }
     
     # !!! FOR ZAMBIA, S1 DATA IS MISSING FOR HALF THE COUNTRY IN 2022 !!!
@@ -142,7 +142,7 @@ def feature_layers(query):
     semiannual_geomedian_times = {
         "semiannual_2021_01": "2021-01-01",
         "semiannual_2021_06": "2021-06-01",
-#         "semiannual_2022_01": "2022-01-01",
+        "semiannual_2022_01": "2022-01-01",
     }
 
     # ----------------- DEFINE MEASUREMENTS TO USE FOR EACH PRODUCT -----------------

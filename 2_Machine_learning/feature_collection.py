@@ -90,60 +90,37 @@ def apply_function_over_custom_times(ds, func, func_name, time_ranges):
 def feature_layers(query):
     """Compute feature layers according to datacube query"""
     
-#     query = static_query.copy() # include to make sure original query isn't modified
+    baseline_query = query.copy() # include to make sure original query isn't modified
 
     # Connnect to datacube
     dc = datacube.Datacube(app="crop_type_ml")
 
-#     # Check query for required time ranges and remove them
-#     if all(
-#         [
-#             key in query.keys()
-#             for key in [
-#                 "time_ranges",
-#                 "annual_geomedian_times",
-#                 "semiannual_geomedian_times",
-#             ]
-#         ]
-#     ):
-#         pass
-#     else:
-#         print(
-#             "Query missing at least one of time_ranges, annual_geomedian_times, or semiannual_geomedian_times"
-#         )
-#         sys.exit(1)
+    # Check query for required time ranges and remove them
+    if all(
+        [
+            key in baseline_query.keys()
+            for key in [
+                "annual_geomedian_times",
+                "semiannual_geomedian_times",
+                "s1_time_ranges",
+                "time_ranges",
+            ]
+        ]
+    ):
+        pass
+    else:
+        print(
+            "Query missing at least one of annual_geomedian_times, semiannual_geomedian_times, s1_time_ranges, or time_ranges"
+        )
+        sys.exit(1)
 
-#     # ----------------- STORE TIME RANGES FOR CUSTOM QUERIES -----------------
-#     # This removes these items from the query so it can be used for loads
-#     time_ranges = query.pop("time_ranges")
-#     annual_geomedian_times = query.pop("annual_geomedian_times")
-#     semiannual_geomedian_times = query.pop("semiannual_geomedian_times")
+    # ----------------- STORE TIME RANGES FOR CUSTOM QUERIES -----------------
+    # This removes these items from the query so it can be used for loads
 
-    # ----------------- HARDCODE TIME RANGES FOR CUSTOM QUERIES -----------------
-    # This means the function can be used without modifying the datacube query
-    
-    time_ranges = {
-        "Q3_2021": slice("2021-08-01", "2022-10-31"),
-        "Q4_2021": slice("2021-11-01", "2022-01-31"),
-        "Q1_2022": slice("2022-02-01", "2022-04-30"),
-        "Q2_2022": slice("2022-05-01", "2022-07-30"),
-    }
-    
-    # !!! FOR ZAMBIA, S1 DATA IS MISSING FOR HALF THE COUNTRY IN 2022 !!!
-    s1_time_ranges = {
-        "Q3_2021": slice("2021-08-01", "2022-10-31"),
-        "Q4_2021": slice("2021-11-01", "2022-01-31"),
-    }
-    
-    annual_geomedian_times = {
-        "annual_2021": "2021-01-01",
-    }
-    
-    semiannual_geomedian_times = {
-        "semiannual_2021_01": "2021-01-01",
-        "semiannual_2021_06": "2021-06-01",
-        "semiannual_2022_01": "2022-01-01",
-    }
+    annual_geomedian_times = baseline_query.pop("annual_geomedian_times")
+    semiannual_geomedian_times = baseline_query.pop("semiannual_geomedian_times")
+    s1_time_ranges = baseline_query.pop("s1_time_ranges")
+    time_ranges = baseline_query.pop("time_ranges")
 
     # ----------------- DEFINE MEASUREMENTS TO USE FOR EACH PRODUCT -----------------
 
@@ -172,6 +149,13 @@ def feature_layers(query):
     # ----------------- S2 CUSTOM GEOMEDIANS -----------------
     # These are designed to take the geomedian for every range in time_ranges
     # This is controlled through the input query
+    
+    s2_query = baseline_query.copy()
+    
+    s2_query_times = list(time_ranges.values())
+    s2_start_date = s2_query_times[0].start
+    s2_end_date = s2_query_times[-1].stop
+    s2_query.update({"time": (s2_start_date, s2_end_date)})
 
     ds = load_ard(
         dc=dc,
@@ -179,7 +163,7 @@ def feature_layers(query):
         measurements=s2_measurements,
         group_by="solar_day",
         verbose=False,
-        **query,
+        **s2_query,
     )
     
     
@@ -192,9 +176,11 @@ def feature_layers(query):
     # ----------------- S2 ANNUAL GEOMEDIAN -----------------
 
     # Update query to use annual_geomedian_times
-    ds_annual_geomad_query = query.copy()
-    query_times = list(annual_geomedian_times.values())
-    ds_annual_geomad_query.update({"time": (query_times[0], query_times[-1])})
+    ds_annual_geomad_query = baseline_query.copy()
+    annual_query_times = list(annual_geomedian_times.values())
+    annual_start_date = annual_query_times[0]
+    annual_end_date = annual_query_times[-1]
+    ds_annual_geomad_query.update({"time": (annual_start_date, annual_end_date)})
 
     # load s2 annual geomedian
     ds_s2_geomad = dc.load(
@@ -212,9 +198,11 @@ def feature_layers(query):
     # ----------------- S2 SEMIANNUAL GEOMEDIAN -----------------
 
     # Update query to use semiannual_geomedian_times
-    ds_semiannual_geomad_query = query.copy()
-    query_times = list(semiannual_geomedian_times.values())
-    ds_semiannual_geomad_query.update({"time": (query_times[0], query_times[-1])})
+    ds_semiannual_geomad_query = baseline_query.copy()
+    semiannual_query_times = list(semiannual_geomedian_times.values())
+    semiannual_start_date = semiannual_query_times[0]
+    semiannual_end_date = semiannual_query_times[-1]
+    ds_semiannual_geomad_query.update({"time": (semiannual_start_date, semiannual_end_date)})
 
     # load s2 semiannual geomedian
     ds_s2_semiannual_geomad = dc.load(
@@ -231,8 +219,13 @@ def feature_layers(query):
     # ----------------- S1 CUSTOM GEOMEDIANS -----------------
 
     # Update query to suit Sentinel 1
-    s1_query = query.copy()
+    s1_query = baseline_query.copy()
     s1_query.update({"sat_orbit_state": "ascending"})
+    
+    s1_query_times = list(s1_time_ranges.values())
+    s1_start_date = s1_query_times[0].start
+    s1_end_date = s1_query_times[-1].stop
+    s1_query.update({"time": (s1_start_date, s1_end_date)})
 
     # Load s1
     s1_ds = load_ard(
@@ -252,8 +245,13 @@ def feature_layers(query):
     # -------- LANDSAT BIMONTHLY FRACTIONAL COVER -----------
 
     # Update query to suit fractional cover
-    fc_query = query.copy()
+    fc_query = baseline_query.copy()
     fc_query.update({"resampling": "bilinear", "measurements": fc_measurements})
+    
+    fc_query_times = list(time_ranges.values())
+    fc_start_date = fc_query_times[0].start
+    fc_end_date = fc_query_times[-1].stop
+    fc_query.update({"time": (fc_start_date, fc_end_date)})
 
     # load fractional cover
     ds_fc = dc.load(product="fc_ls", collection_category="T1", **fc_query)
@@ -263,7 +261,7 @@ def feature_layers(query):
     # load wofls
     ds_wofls = dc.load(product='wofs_ls',
                 like=ds_fc.geobox,
-                time=query['time'],
+                time=fc_query['time'],
                 collection_category='T1')
     
     clear_and_dry = masking.make_mask(ds_wofls, dry=True).water
@@ -305,7 +303,7 @@ def feature_layers(query):
 #     )
 
     # -------- DEM SLOPE -----------
-    slope_query = query.copy()
+    slope_query = baseline_query.copy()
     slope_query.update(
         {
             "resampling": "bilinear",
@@ -313,7 +311,7 @@ def feature_layers(query):
             "time": "2000-01-01",
         }
     )
-
+    
     # Load slope data and update no data values and coordinates
     ds_slope = dc.load(product="dem_srtm_deriv", **slope_query)
 
